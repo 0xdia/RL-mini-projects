@@ -1,30 +1,36 @@
 import numpy as np
 from collections import defaultdict
 import pickle
+import random
 
 class Agent:
 
-    def __init__(self, nA=6):
+    def __init__(self, nA=6, eps0=1.0):
         """ Initialize the agent.
 
         Params
         ======
         - nA: number of actions available to the agent
+        - eps0: epsilon hyperparameter of ε-greedy action selection
         """
         self.nA = nA
         self.Q = defaultdict(lambda: np.zeros(self.nA))
+        self.eps0 = eps0
 
-    def select_action(self, state):
-        """ Given the state, select an action.
+    def select_action(self, state, eps):
+        """ Given the state, select an action using ε-greedy. 
 
         Params
         ======
         - state: the current state of the environment
+        - eps: eps parameter
 
         Returns
         =======
         - action: an integer, compatible with the task's action space
         """
+        if random.random() > eps:
+          return np.argmax(self.Q[state])
         return np.random.choice(self.nA)
 
     def step(self, state, action, reward, next_state, done):
