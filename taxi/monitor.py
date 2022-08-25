@@ -3,7 +3,7 @@ import sys
 import math
 import numpy as np
 
-def interact(env, agent, num_episodes=20000, window=100):
+def interact(env, agent, num_episodes=20000, method="expected_sarsa", window=100, save_policy=False):
     """ Monitor agent's performance.
     
     Params
@@ -61,4 +61,6 @@ def interact(env, agent, num_episodes=20000, window=100):
             print('\nEnvironment solved in {} episodes.'.format(i_episode), end="")
             break
         if i_episode == num_episodes: print('\n')
+    if save_policy:
+      agent.save_policy(method)
     return avg_rewards, best_avg_reward

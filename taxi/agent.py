@@ -1,6 +1,6 @@
 import numpy as np
 from collections import defaultdict
-
+import pickle
 
 class Agent:
 
@@ -39,3 +39,10 @@ class Agent:
         - done: whether the episode is complete (True or False)
         """
         self.Q[state][action] += 1
+
+    def save_policy(self, used_method):
+      optimal_policy_estimate = dict()
+      for state, Qs in self.Q.items():
+        optimal_policy_estimate[state] = np.argmax(Qs)
+      with open(f"learned_policies/learned_policy_from_{used_method}.pickle", "wb") as output_file:
+        pickle.dump(optimal_policy_estimate, output_file)
