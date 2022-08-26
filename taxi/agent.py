@@ -30,7 +30,7 @@ class Agent:
       ======
       - episode_num: the number of the current episode
       """
-      self.eps = self.eps0 / episode_num
+      self.eps = self.eps0 / (1 + 0.1 * episode_num)
       
     def select_action(self, state):
         """ Given the state, select an action using ε-greedy. 
@@ -86,8 +86,8 @@ class Agent:
       - next_state: the current state of the environment
       """
       state_policy = np.ones(self.nA) * self.eps / self.nA
-      state_policy[np.argmax(self.Q[state])] = 1 - self.eps + self.eps / self.nA
-      expected_return = reward + self.gamma * np.dot(state_policy, self.Q[state])
+      state_policy[np.argmax(self.Q[next_state])] = 1 - self.eps + self.eps / self.nA
+      expected_return = reward + self.gamma * np.dot(state_policy, self.Q[next_state])
       self.Q[state][action] += self.alpha * (expected_return - self.Q[state][action])
       
     def step(self, state, action, reward, next_state, next_action, done, method):

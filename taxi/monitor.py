@@ -46,6 +46,7 @@ def interact(env, agent, num_episodes=20000, method="expected_sarsa", window=100
             # update the state (s <- s') to next time step
             state = next_state
             # update the action (a <- a') to next time step
+            action = next_action
             if done:
                 # save final sampled reward
                 samp_rewards.append(samp_reward)
