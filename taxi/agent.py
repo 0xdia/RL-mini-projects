@@ -32,19 +32,22 @@ class Agent:
       """
       self.eps = self.eps0 / (1 + 0.1 * episode_num)
       
-    def select_action(self, state):
-        """ Given the state, select an action using ε-greedy. 
+    def select_action(self, state, learning_is_frozen=False):
+        """ Given the state, select an action.
+            If learning_is_frozen, the best action is selected.
+            Else, ε-greedy is used. 
 
         Params
         ======
         - state: the current state of the environment
         - eps: eps parameter
+        - learning_is_frozen: whether learning is frozen (testing mode)
 
         Returns
         =======
         - action: an integer, compatible with the task's action space
         """
-        if random.random() > self.eps:
+        if learning_is_frozen or random.random() >= self.eps:
           return np.argmax(self.Q[state])
         return np.random.choice(self.nA)
 
@@ -90,7 +93,7 @@ class Agent:
       expected_return = reward + self.gamma * np.dot(state_policy, self.Q[next_state])
       self.Q[state][action] += self.alpha * (expected_return - self.Q[state][action])
       
-    def step(self, state, action, reward, next_state, next_action, done, method):
+    def step(self, state, action, reward, next_state, next_action, done, method, freeze_learning=False):
         """ Update the agent's knowledge, using the most recently sampled tuple.
 
         Params
@@ -102,7 +105,10 @@ class Agent:
         - next_state: the current state of the environment
         - next_action: the picked action to be performed next
         - done: whether the episode is complete (True or False)
+        - freeze_learning: whether to freeze learning (testing mode)
         """
+        if freeze_learning:
+          return  
         assert method in ["sarsa", "q_learning", "expected_sarsa"]
         if method == "sarsa":
           self.update_Q_sarsa(state, action, reward, next_state, next_action) 
