@@ -28,19 +28,24 @@ def interact(env, agent, num_episodes=20000, method="expected_sarsa", window=100
     for i_episode in range(1, num_episodes+1):
         # begin the episode
         state = env.reset()
+        # the agent selectd an action
+        action = agent.select_action(state)
+        # update ε
+        agent.update_eps(i_episode)
         # initialize the sampled reward
         samp_reward = 0
         while True:
-            # agent selects an action
-            action = agent.select_action(state)
             # agent performs the selected action
             next_state, reward, done, _ = env.step(action)
+            # the agent selects an action for the next time step
+            next_action = agent.select_action(next_state)
             # agent performs internal updates based on sampled experience
-            agent.step(state, action, reward, next_state, done)
+            agent.step(state, action, reward, next_state, next_action, done, method)
             # update the sampled reward
             samp_reward += reward
             # update the state (s <- s') to next time step
             state = next_state
+            # update the action (a <- a') to next time step
             if done:
                 # save final sampled reward
                 samp_rewards.append(samp_reward)
