@@ -47,7 +47,7 @@ class Agent:
         =======
         - action: an integer, compatible with the task's action space
         """
-        if learning_is_frozen or random.random() >= self.eps:
+        if learning_is_frozen or random.random() > self.eps:
           return np.argmax(self.Q[state])
         return np.random.choice(self.nA)
 
