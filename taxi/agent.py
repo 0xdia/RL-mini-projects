@@ -24,13 +24,13 @@ class Agent:
 
     def update_eps(self, episode_num):
       """ Update ε following the formula:
-              ε <- ε0 / episode_num
+              ε <- min(0, ε0 / (1 + episode_num * 0.1))
 
       Params
       ======
       - episode_num: the number of the current episode
       """
-      self.eps = self.eps0 / (1 + 0.1 * episode_num)
+      self.eps = min(self.eps0 / (1 + 0.1 * episode_num), 0.1)
       
     def select_action(self, state, learning_is_frozen=False):
         """ Given the state, select an action.
