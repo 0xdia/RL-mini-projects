@@ -5,7 +5,7 @@ import random
 
 class Agent:
 
-    def __init__(self, nA=6, eps0=1.0, gamma=1.0, alpha=0.01):
+    def __init__(self, nA=6, eps0=1.0, gamma=1.0, alpha=0.2):
         """ Initialize the agent.
 
         Params
@@ -16,22 +16,22 @@ class Agent:
         - alpha: alpha hyperparameter
         """
         self.nA = nA
-        self.Q = defaultdict(lambda: np.zeros(self.nA))
+        self.Q = defaultdict(lambda: np.ones(self.nA))
         self.eps0 = eps0
         self.eps = eps0
         self.gamma = gamma
         self.alpha = alpha
-
+      
     def update_eps(self, episode_num):
       """ Update ε following the formula:
-              ε <- min(0, ε0 / (1 + episode_num * 0.1))
+              ε <- ε0 / (1 + episode_num * 0.2)
 
       Params
       ======
       - episode_num: the number of the current episode
       """
-      self.eps = min(self.eps0 / (1 + 0.1 * episode_num), 0.1)
-      
+      self.eps = self.eps0 / (1 + 0.2 * episode_num)
+     
     def select_action(self, state, learning_is_frozen=False):
         """ Given the state, select an action.
             If learning_is_frozen, the best action is selected.

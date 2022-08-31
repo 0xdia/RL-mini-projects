@@ -8,6 +8,8 @@ authors = ["Replit user <<>>"]
 python = "^3.8"
 numpy = "^1.23.2"
 gym = "^0.25.2"
+pygame = "^2.1.2"
+matplotlib = "^3.5.3"
 
 [tool.poetry.dev-dependencies]
 

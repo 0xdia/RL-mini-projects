@@ -73,4 +73,4 @@ def interact(env, agent, num_episodes=20000, method="expected_sarsa", window=100
           if i_episode == num_episodes: print('\n')
     if save_policy:
       agent.save_policy(method)
-    return np.mean(samp_rewards) if mode == "test" else (avg_rewards, best_avg_reward)
+    return (np.mean(samp_rewards) if mode == "test" else avg_rewards, best_avg_reward)
