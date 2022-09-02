@@ -15,7 +15,7 @@ UPDATE_EVERY = 4
 
 class Agent:
     def __init__(self, state_size, action_size, seed, load_trained_model=False, model_state_path=None, train_mode=False):
-        assert load_trained_model == (model_state_path is not None)
+        assert (not load_trained_model) or (load_trained_model and model_state_path is not None)
 
         self.seed = random.seed(seed)
         self.state_size = state_size
@@ -49,7 +49,7 @@ class Agent:
         if self.t_step == 0:
             if len(self.memory) > BATCH_SIZE:
                 experiences = self.memory.sample()
-                self.learn(experiences)
+                self.learn(experiences, "double_dql")
 
     def act(self, state, eps=.1):
         state = torch.from_numpy(state).float().unsqueeze(0)
@@ -64,9 +64,14 @@ class Agent:
         else:
             return random.choice(np.arange(self.action_size))
     
-    def learn(self, experiences):
+    def learn(self, experiences, method):
         states, actions, rewards, next_states, dones = experiences
-        Q_target_next = self.qnetwork_target(next_states).detach().max(1)[0].unsqueeze(1)
+        Q_target_next = Q_targets = None
+        if method == 'dql':
+            Q_target_next = self.qnetwork_target(next_states).detach().max(1)[0].unsqueeze(1)
+        elif method == 'double_dql':
+            max_qvalue_actions = self.qnetwork_local(next_states).detach().argmax(1).unsqueeze(1)
+            Q_target_next = self.qnetwork_target(next_states).detach().gather(1, max_qvalue_actions)
         Q_targets = rewards + (GAMMA * Q_target_next * (1 - dones))
         Q_expected = self.qnetwork_local(states).gather(1, actions)
         loss = torch.nn.functional.mse_loss(Q_expected, Q_targets)
@@ -79,6 +84,7 @@ class Agent:
         for target_param, local_param in zip(self.qnetwork_target.parameters(), self.qnetwork_local.parameters()):
             target_param.data.copy_(ALPHA*local_param.data + (1.0-ALPHA)*target_param.data)
 
+
     def save_model(self, path, scores):
         assert path is not None
 
@@ -86,7 +92,7 @@ class Agent:
             "qnetwork_local": self.qnetwork_local.state_dict(),
             "qnetwork_target": self.qnetwork_target.state_dict(),
             #"replay_buffer": self.memory,
-            "scores": scores,
-            "last_episode": self.episode_num
+            #"scores": scores,
+            #"last_episode": self.episode_num
         }
         torch.save(model_state, path)
