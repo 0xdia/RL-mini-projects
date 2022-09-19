@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Bananas environment
+healthy_banana_navigation/bananas_env/*
