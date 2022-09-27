@@ -15,11 +15,4 @@ class Policy(torch.nn.Module):
         x = state
         for l in range(len(self.layers)-1):
             x = torch.nn.functional.relu(self.layers[l](x))
-        return torch.nn.functional.softmax(self.layers[-1](x), dim=1)
-
-    def act(self, state):
-        state = torch.from_numpy(state).float().unsqueeze(0)
-        probs = self.forward(state)
-        m = torch.distributions.Categorical(probs)
-        action = m.sample()
-        return action.item(), m.log_prob(action)
+        return self.layers[-1](x)
