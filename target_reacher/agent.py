@@ -5,6 +5,7 @@ from policy import Policy
 from neural_net import QNeuralNetwork
 from replay_buffer import ReplayBuffer
 from exploration_noise import OrnsteinUhlenbeckProcess
+from schedule import IncreasingLinearSchedule
 
 GAMMA = 0.99
 LEARNING_RATE = 1e-2
@@ -12,7 +13,6 @@ TAU = 1e-2
 BUFFER_SIZE = int(1e5)
 BATCH_SIZE = 32
 MODEL_PATH = './learned_policy'
-
 
 class Agent:
     def __init__(self, state_size, action_size, action_low, action_high, load_model, seed):
@@ -33,12 +33,15 @@ class Agent:
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         self.reply_buffer = ReplayBuffer(BUFFER_SIZE, BATCH_SIZE, seed)
-        # self.random_process = OrnsteinUhlenbeckProcess()
+        self.random_process = OrnsteinUhlenbeckProcess(size=action_size, std=IncreasingLinearSchedule(0.1, 1, 9))
 
         self.model_path = MODEL_PATH
         if load_model:
             trained_model_state = torch.load(self.model_path)
             self.actor.load_state_dict(trained_model_state["policy"])
+
+    def reset_noise(self):
+        self.random_process.reset_states()
 
     def soft_update(self):
         for target_param, local_param in zip(self.critic_target.parameters(), self.critic.parameters()):
@@ -48,10 +51,11 @@ class Agent:
 
     def act(self, state):
         state = torch.from_numpy(state).float().unsqueeze(0)
-        action = self.actor(state) # + self.random_process()
-        action = np.clip(action.detach().numpy(), self.action_low, self.action_high)
-        self.prev_action, self.prev_state = action, state
-        return action
+        with torch.no_grad():
+            action = self.actor(state) + self.random_process.sample()
+            action = np.clip(action.detach().numpy(), self.action_low, self.action_high)
+            self.prev_action, self.prev_state = action, state
+            return action
 
     def step(self, reward, state, done):
         self.reply_buffer.add(self.prev_state, self.prev_action, reward, state, done)
@@ -62,7 +66,7 @@ class Agent:
     def learn(self, experiences):
         states, actions, rewards, next_states, dones = experiences
         target_actions = self.actor_target(next_states)
-        target_critics = rewards + self.gamma * self.critic_target(next_states, target_actions)
+        target_critics = rewards + self.gamma * self.critic_target(next_states, target_actions) * (1 - dones)
         expected_critics = self.critic(states, actions)
 
         critic_loss = torch.nn.functional.mse_loss(expected_critics, target_critics)

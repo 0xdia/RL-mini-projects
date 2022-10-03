@@ -21,6 +21,7 @@ def monitor(num_episodes=1500, train_mode=True, load_model=False, save_model=Tru
     scores_deque = deque(maxlen=50)
     scores = []
     for episode in range(1, num_episodes+1):
+        print("episode: ", episode)
         score = 0
         env_info = env.reset(train_mode=train_mode)[brain_name]    
         state = env_info.vector_observations[0]
@@ -34,6 +35,7 @@ def monitor(num_episodes=1500, train_mode=True, load_model=False, save_model=Tru
             if train_mode:
                 agent.step(reward, next_state, done)
             if done:
+                agent.reset_noise()
                 break
             state = next_state
         scores_deque.append(score)
