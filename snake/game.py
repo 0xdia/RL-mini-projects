@@ -1,30 +1,20 @@
 import numpy as np
 import gym
-import pygame
 from gym import spaces
 from pygame.math import Vector2
 
 import fruit
 
-CELL_SIZE = 40
+CELL_SIZE = 35
 
 NUM_OF_APPLES = 1
 EATING_REWARD = 1
 
 
 class GameGymEnv(gym.Env):
-    metadata = {"render_fps": 65}
-
     def __init__(self, snakes, num_of_cells):
         super(GameGymEnv, self).__init__()
         self.num_of_cells = num_of_cells
-        #self.screen = pygame.display.set_mode(
-        #    (self.num_of_cells * CELL_SIZE, self.num_of_cells * CELL_SIZE)
-        #)
-        #pygame.mixer.pre_init(44100, -16, 2, 512)
-        #pygame.init()
-        #self.apple = pygame.image.load("Graphics/apple.png").convert_alpha()
-        #self.game_font = pygame.font.Font("Font/PoetsenOne-Regular.ttf", 25)
         self.snakes = snakes
         self.fruits = []
 
@@ -32,8 +22,6 @@ class GameGymEnv(gym.Env):
             0, 5, shape=(self.num_of_cells, self.num_of_cells), dtype=np.uint8
         )
         self.action_space = spaces.Discrete(4)
-
-        self.clock = pygame.time.Clock()
 
     def reset(self):
         super().reset()
@@ -43,22 +31,26 @@ class GameGymEnv(gym.Env):
                 if part == self.fruits[j].pos:
                     self.fruits.pop(j)
                     break
-        # self._render_frame()
         return np.array(self._get_obs())
 
-    def direct(self, snake, action):
+    def direct(self, action):
         if action == 0:
-            if snake.direction.y != 1:
-                snake.direction = Vector2(0, -1)  # up
+            if self.snakes.direction.y != 1:
+                self.snakes.direction = Vector2(0, -1)  # up
         elif action == 1:
-            if snake.direction.x != -1:
-                snake.direction = Vector2(1, 0)  # right
+            if self.snakes.direction.x != -1:
+                self.snakes.direction = Vector2(1, 0)  # right
         elif action == 2:
-            if snake.direction.y != -1:
-                snake.direction = Vector2(0, 1)  # down
+            if self.snakes.direction.y != -1:
+                self.snakes.direction = Vector2(0, 1)  # down
         else:
-            if snake.direction.x != 1:
-                snake.direction = Vector2(-1, 0)  # left
+            if self.snakes.direction.x != 1:
+                self.snakes.direction = Vector2(-1, 0)  # left
+        self.snakes.body.insert(0, self.snakes.body[0] + self.snakes.direction)
+        if self.snakes.new_block == True:
+            self.snakes.new_block = False
+        else:
+            self.snakes.body.pop(-1)
 
     def _get_obs(self):
         state = [[0] * self.num_of_cells for _ in range(self.num_of_cells)]
@@ -73,35 +65,37 @@ class GameGymEnv(gym.Env):
             state[f.x][f.y] = 5
         return state
 
-    def get_snakes(self):
-        return self._get_info()
-
     def _get_info(self):
         return {"snakes_heads": self.snakes.body[0], "fruits": len(self.fruits)}
+
+    def distance(self):
+        # check the presence of fruits
+        if len(self.fruits) > 0:
+            return np.abs(self.snakes.body[0].x - self.fruits[0].x) + np.abs(
+                self.snakes.body[0].y - self.fruits[0].y
+            )
+        return 0
 
     def step(self, action):
         dones = False
         rewards = 0
-        self.direct(self.snakes, action)
-        self.snakes.body.insert(0, self.snakes.body[0] + self.snakes.direction)
-        if self.snakes.new_block == True:
-            self.snakes.new_block = False
-        else:
-            self.snakes.body.pop(-1)
-        rewards = self.check_eats(0)
-        if self.check_collision():
+        self.direct(action)
+        if self.check_eats():
+            rewards = EATING_REWARD
+        elif self.check_collision():
             dones = True
-            rewards = -10
-        # self._render_frame()
+            rewards = -50
+        else:
+            rewards = -self.distance()
         return self._get_obs(), rewards, dones, self._get_info()
 
-    def check_eats(self, s):
+    def check_eats(self):
         for i in range(len(self.fruits)):
             if self.fruits[i].pos == self.snakes.body[0]:
                 self.fruits.pop(i)
                 self.snakes.add_block()
-                return EATING_REWARD
-        return 0
+                return True
+        return False
 
     def check_collision(self):
         return self.snakes.check_if_crashed([self.snakes], self.num_of_cells)
@@ -110,54 +104,7 @@ class GameGymEnv(gym.Env):
         self._render_frame()
 
     def _render_frame(self):
-        self.screen.fill((175, 215, 70))
-
-        self.render_grass()
-        for fruit in self.fruits:
-            fruit.draw_fruit(self.screen, CELL_SIZE, self.apple)
-        self.snakes.render(self.screen, CELL_SIZE)
-        self.render_score()
-
-        pygame.display.update()
-        self.clock.tick(self.metadata["render_fps"])
-
-    def render_grass(self):
-        grass_color = (167, 209, 61)
-        for row in range(self.num_of_cells):
-            if row % 2 == 0:
-                for col in range(self.num_of_cells):
-                    if col % 2 == 0:
-                        grass_rect = pygame.Rect(
-                            col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE
-                        )
-                        pygame.draw.rect(self.screen, grass_color, grass_rect)
-            else:
-                for col in range(self.num_of_cells):
-                    if col % 2 != 0:
-                        grass_rect = pygame.Rect(
-                            col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE
-                        )
-                        pygame.draw.rect(self.screen, grass_color, grass_rect)
-
-    def render_score(self):
-        score_text = str(sum([len(snake.body) - 3 for snake in [self.snakes]]))
-        score_surface = self.game_font.render(score_text, True, (56, 74, 12))
-        score_x = int(CELL_SIZE * self.num_of_cells - 60)
-        score_y = int(CELL_SIZE * self.num_of_cells - 40)
-        score_rect = score_surface.get_rect(center=(score_x, score_y))
-        apple_rect = self.apple.get_rect(midright=(score_rect.left, score_rect.centery))
-        bg_rect = pygame.Rect(
-            apple_rect.left,
-            apple_rect.top,
-            apple_rect.width + score_rect.width + 6,
-            apple_rect.height,
-        )
-
-        pygame.draw.rect(self.screen, (167, 209, 61), bg_rect)
-        self.screen.blit(score_surface, score_rect)
-        self.screen.blit(self.apple, apple_rect)
-        pygame.draw.rect(self.screen, (56, 74, 12), bg_rect, 2)
+        pass
 
     def close(self):
-        pygame.display.quit()
-        pygame.quit()
+        pass
