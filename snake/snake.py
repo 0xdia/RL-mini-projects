@@ -12,11 +12,14 @@ class Snake:
         self.new_block = False
         self.model = None
 
+    def get_head(self):
+        return self.body[0]
+
     def learn(self, env):
         self.model = DQN(
             "MlpPolicy",
             env,
-            learning_rate=0.001,
+            learning_rate=0.0001,
             buffer_size=100000,
             learning_starts=50000,
             batch_size=32,
@@ -25,18 +28,18 @@ class Snake:
             train_freq=4,
             gradient_steps=1,
             target_update_interval=1000,
-            exploration_fraction=0.3,
+            exploration_fraction=0.35,
             exploration_initial_eps=1.0,
-            exploration_final_eps=0.05,
+            exploration_final_eps=0.1,
             max_grad_norm=10,
             verbose=1,
             device="auto",
             tensorboard_log="./dqn_snake_tensorboard/",
         )
         self.model.learn(
-            total_timesteps=int(1e6),
+            total_timesteps=int(5e5),
             log_interval=500,
-            tb_log_name="eighth_run",
+            tb_log_name="rew=10",
             progress_bar=True,
         )
         self.model.save("dqn_snake")

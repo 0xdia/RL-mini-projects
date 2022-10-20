@@ -7,8 +7,8 @@ import fruit
 
 CELL_SIZE = 35
 
-NUM_OF_APPLES = 1
-EATING_REWARD = 1
+NUM_OF_FRUITS = 0
+EATING_REWARD = 0
 
 
 class GameGymEnv(gym.Env):
@@ -19,19 +19,30 @@ class GameGymEnv(gym.Env):
         self.fruits = []
 
         self.observation_space = spaces.Box(
-            0, 5, shape=(self.num_of_cells, self.num_of_cells), dtype=np.uint8
+            -1, 0, shape=(1, 3), dtype=np.int8
         )
         self.action_space = spaces.Discrete(4)
 
     def reset(self):
         super().reset()
         self.snakes.reset(self.num_of_cells)
-        for part in self.snakes.body:
-            for j in range(len(self.fruits)):
-                if part == self.fruits[j].pos:
-                    self.fruits.pop(j)
-                    break
+        # self.add_fruits()
         return np.array(self._get_obs())
+
+    def add_fruits(self):
+        while True:
+            for j in range(len(self.fruits)):
+                if self.fruits[j].pos in self.snakes.body:
+                    self.fruits.pop(j)
+            if len(self.fruits) == NUM_OF_FRUITS:
+                break
+            current_num_fruits = len(self.fruits)
+            self.fruits.extend(
+                [
+                    fruit.Fruit(self.num_of_cells)
+                    for _ in range(NUM_OF_FRUITS - current_num_fruits)
+                ]
+            )
 
     def direct(self, action):
         if action == 0:
@@ -53,40 +64,109 @@ class GameGymEnv(gym.Env):
             self.snakes.body.pop(-1)
 
     def _get_obs(self):
+        """
         state = [[0] * self.num_of_cells for _ in range(self.num_of_cells)]
         for y, x in self.snakes.body:
             if (0 <= x < self.num_of_cells) and (0 <= y < self.num_of_cells):
                 state[int(x)][int(y)] = 1
-        for _ in range(NUM_OF_APPLES - len(self.fruits)):
+        for _ in range(NUM_OF_FRUITS - len(self.fruits)):
             f = fruit.Fruit(self.num_of_cells)
             if state[f.x][f.y] == 0:
                 self.fruits.append(f)
         for f in self.fruits:
-            state[f.x][f.y] = 5
-        return state
+            state[f.x][f.y] = 5"""
+        state = [0, 0, 0]
+        if self.snakes.direction.x == 1:  # snake heading right
+            if (
+                self.snakes.get_head() + Vector2(1, 0) in self.snakes.body[1:]
+                or self.snakes.get_head().x + 1 == self.num_of_cells
+            ):  # check front
+                state[0] = -1
+            if (
+                self.snakes.get_head() + Vector2(0, -1) in self.snakes.body[1:]
+                or self.snakes.get_head().y - 1 < 0
+            ):  # check left
+                state[1] = -1
+            if (
+                self.snakes.get_head() + Vector2(0, 1) in self.snakes.body[1:]
+                or self.snakes.get_head().y + 1 == self.num_of_cells
+            ):  # check right
+                state[2] = -1
+
+        elif self.snakes.direction.x == -1:  # snake heading left
+            if (
+                self.snakes.get_head() + Vector2(-1, 0) in self.snakes.body[1:]
+                or self.snakes.get_head().x - 1 < 0
+            ):  # check front
+                state[0] = -1
+            if (
+                self.snakes.get_head() + Vector2(0, -1) in self.snakes.body[1:]
+                or self.snakes.get_head().y - 1 < 0
+            ):  # check right
+                state[2] = -1
+            if (
+                self.snakes.get_head() + Vector2(0, 1) in self.snakes.body[1:]
+                or self.snakes.get_head().y + 1 == self.num_of_cells
+            ):  # check left
+                state[1] = -1
+
+        if self.snakes.direction.y == 1:  # snake heading down
+            if (
+                self.snakes.get_head() + Vector2(0, 1) in self.snakes.body[1:]
+                or self.snakes.get_head().y + 1 == self.num_of_cells
+            ):  # check front
+                state[0] = -1
+            if (
+                self.snakes.get_head() + Vector2(-1, 0) in self.snakes.body[1:]
+                or self.snakes.get_head().x - 1 < 0
+            ):  # check right
+                state[2] = -1
+            if (
+                self.snakes.get_head() + Vector2(1, 0) in self.snakes.body[1:]
+                or self.snakes.get_head().x + 1 == self.num_of_cells
+            ):  # check left
+                state[1] = -1
+
+        elif self.snakes.direction.y == -1:  # snake heading up
+            if (
+                self.snakes.get_head() + Vector2(0, -1) in self.snakes.body[1:]
+                or self.snakes.get_head().y - 1 < 0
+            ):  # check front
+                state[0] = -1
+            if (
+                self.snakes.get_head() + Vector2(1, 0) in self.snakes.body[1:]
+                or self.snakes.get_head().x + 1 == self.num_of_cells
+            ):  # check right
+                state[2] = -1
+            if (
+                self.snakes.get_head() + Vector2(-1, 0) in self.snakes.body[1:]
+                or self.snakes.get_head().x - 1 < 0
+            ):  # check left
+                state[1] = -1
+
+        return np.array(state)
 
     def _get_info(self):
         return {"snakes_heads": self.snakes.body[0], "fruits": len(self.fruits)}
 
     def distance(self):
-        # check the presence of fruits
-        if len(self.fruits) > 0:
-            return np.abs(self.snakes.body[0].x - self.fruits[0].x) + np.abs(
-                self.snakes.body[0].y - self.fruits[0].y
-            )
-        return 0
+        return np.abs(self.snakes.body[0].x - self.fruits[0].x) + np.abs(
+            self.snakes.body[0].y - self.fruits[0].y
+        )
 
     def step(self, action):
         dones = False
         rewards = 0
         self.direct(action)
-        if self.check_eats():
-            rewards = EATING_REWARD
-        elif self.check_collision():
+        # if self.check_eats():
+        # rewards = EATING_REWARD
+        # self.add_fruits()
+        if self.check_collision():
             dones = True
-            rewards = -50
+            rewards = -2
         else:
-            rewards = -self.distance()
+            rewards = 1
+            # rewards = -self.distance()
         return self._get_obs(), rewards, dones, self._get_info()
 
     def check_eats(self):
