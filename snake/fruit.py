@@ -1,11 +1,21 @@
 from pygame.math import Vector2
 import numpy as np
+import pygame
 
 
 class Fruit:
     def __init__(self, number_of_cells):
         self.x = self.y = self.pos = None
         self.randomize(number_of_cells)
+
+    def draw_fruit(self, screen, cell_size, apple):
+        fruit_rect = pygame.Rect(
+            int(self.pos.x * cell_size),
+            int(self.pos.y * cell_size),
+            cell_size,
+            cell_size,
+        )
+        screen.blit(apple, fruit_rect)
 
     def randomize(
         self,
