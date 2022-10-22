@@ -25,19 +25,8 @@ class GameGymEnv(gym.Env):
         self.observation_space = spaces.Box(
             -1, num_of_cells, shape=(1, 5), dtype=np.int8
         )
-        self.action_space = spaces.Discrete(4)
+        self.action_space = spaces.Discrete(3)
         self.graphics_initiated = False
-        # self._init_graphics()
-
-    def _init_graphics(self):
-        self.screen = pygame.display.set_mode(
-            (self.num_of_cells * CELL_SIZE, self.num_of_cells * CELL_SIZE)
-        )
-        pygame.mixer.pre_init(44100, -16, 2, 512)
-        pygame.init()
-        self.apple = pygame.image.load("Graphics/apple.png").convert_alpha()
-        self.game_font = pygame.font.Font("Font/PoetsenOne-Regular.ttf", 25)
-        self.clock = pygame.time.Clock()
 
     def reset(self):
         super().reset()
@@ -62,17 +51,11 @@ class GameGymEnv(gym.Env):
 
     def direct(self, action):
         if action == 0:
-            if self.snakes.direction.y != 1:
-                self.snakes.direction = Vector2(0, -1)  # up
-        elif action == 1:
-            if self.snakes.direction.x != -1:
-                self.snakes.direction = Vector2(1, 0)  # right
-        elif action == 2:
-            if self.snakes.direction.y != -1:
-                self.snakes.direction = Vector2(0, 1)  # down
-        elif action == 3:
-            if self.snakes.direction.x != 1:
-                self.snakes.direction = Vector2(-1, 0)  # left
+            pass  # heading front, direction not changed
+        else:  # action == 1 is left
+            self.snakes.direction = (
+                self.snakes.go_left()[0] if action == 1 else self.snakes.go_right()[0]
+            )
         self.snakes.body.insert(0, self.snakes.body[0] + self.snakes.direction)
         if self.snakes.new_block == True:
             self.snakes.new_block = False
@@ -80,91 +63,22 @@ class GameGymEnv(gym.Env):
             self.snakes.body.pop(-1)
 
     def _get_obs(self):
-        """
-        state = [[0] * self.num_of_cells for _ in range(self.num_of_cells)]
-        for y, x in self.snakes.body:
-            if (0 <= x < self.num_of_cells) and (0 <= y < self.num_of_cells):
-                state[int(x)][int(y)] = 1
-        for _ in range(NUM_OF_FRUITS - len(self.fruits)):
-            f = fruit.Fruit(self.num_of_cells)
-            if state[f.x][f.y] == 0:
-                self.fruits.append(f)
-        for f in self.fruits:
-            state[f.x][f.y] = 5"""
         state = [
-            0,
-            0,
-            0,
+            -(
+                self.snakes.obstacle_front()
+                or self.snakes.on_edge_front(self.num_of_cells)
+            ),
+            -(
+                self.snakes.obstacle_left()
+                or self.snakes.on_edge_left(self.num_of_cells)
+            ),
+            -(
+                self.snakes.obstacle_right()
+                or self.snakes.on_edge_right(self.num_of_cells)
+            ),
             self.fruits[0].x,
             self.fruits[0].y,
         ]
-        if self.snakes.direction.x == 1:  # snake heading right
-            if (
-                self.snakes.get_head() + Vector2(1, 0) in self.snakes.body[1:]
-                or self.snakes.get_head().x + 1 == self.num_of_cells
-            ):  # check front
-                state[0] = -1
-            if (
-                self.snakes.get_head() + Vector2(0, -1) in self.snakes.body[1:]
-                or self.snakes.get_head().y - 1 < 0
-            ):  # check left
-                state[1] = -1
-            if (
-                self.snakes.get_head() + Vector2(0, 1) in self.snakes.body[1:]
-                or self.snakes.get_head().y + 1 == self.num_of_cells
-            ):  # check right
-                state[2] = -1
-
-        elif self.snakes.direction.x == -1:  # snake heading left
-            if (
-                self.snakes.get_head() + Vector2(-1, 0) in self.snakes.body[1:]
-                or self.snakes.get_head().x - 1 < 0
-            ):  # check front
-                state[0] = -1
-            if (
-                self.snakes.get_head() + Vector2(0, -1) in self.snakes.body[1:]
-                or self.snakes.get_head().y - 1 < 0
-            ):  # check right
-                state[2] = -1
-            if (
-                self.snakes.get_head() + Vector2(0, 1) in self.snakes.body[1:]
-                or self.snakes.get_head().y + 1 == self.num_of_cells
-            ):  # check left
-                state[1] = -1
-
-        if self.snakes.direction.y == 1:  # snake heading down
-            if (
-                self.snakes.get_head() + Vector2(0, 1) in self.snakes.body[1:]
-                or self.snakes.get_head().y + 1 == self.num_of_cells
-            ):  # check front
-                state[0] = -1
-            if (
-                self.snakes.get_head() + Vector2(-1, 0) in self.snakes.body[1:]
-                or self.snakes.get_head().x - 1 < 0
-            ):  # check right
-                state[2] = -1
-            if (
-                self.snakes.get_head() + Vector2(1, 0) in self.snakes.body[1:]
-                or self.snakes.get_head().x + 1 == self.num_of_cells
-            ):  # check left
-                state[1] = -1
-
-        elif self.snakes.direction.y == -1:  # snake heading up
-            if (
-                self.snakes.get_head() + Vector2(0, -1) in self.snakes.body[1:]
-                or self.snakes.get_head().y - 1 < 0
-            ):  # check front
-                state[0] = -1
-            if (
-                self.snakes.get_head() + Vector2(1, 0) in self.snakes.body[1:]
-                or self.snakes.get_head().x + 1 == self.num_of_cells
-            ):  # check right
-                state[2] = -1
-            if (
-                self.snakes.get_head() + Vector2(-1, 0) in self.snakes.body[1:]
-                or self.snakes.get_head().x - 1 < 0
-            ):  # check left
-                state[1] = -1
         return np.array(state)
 
     def _get_info(self):
@@ -186,7 +100,7 @@ class GameGymEnv(gym.Env):
             dones = True
             rewards = -50.0
         else:
-            rewards = 0.
+            rewards = 0.0
         return self._get_obs(), rewards, dones, self._get_info()
 
     def check_eats(self):
@@ -216,6 +130,16 @@ class GameGymEnv(gym.Env):
         self.render_score()
         pygame.display.update()
         self.clock.tick(self.metadata["render_fps"])
+
+    def _init_graphics(self):
+        self.screen = pygame.display.set_mode(
+            (self.num_of_cells * CELL_SIZE, self.num_of_cells * CELL_SIZE)
+        )
+        pygame.mixer.pre_init(44100, -16, 2, 512)
+        pygame.init()
+        self.apple = pygame.image.load("Graphics/apple.png").convert_alpha()
+        self.game_font = pygame.font.Font("Font/PoetsenOne-Regular.ttf", 25)
+        self.clock = pygame.time.Clock()
 
     def render_grass(self):
         grass_color = (167, 209, 61)

@@ -11,35 +11,141 @@ class Snake:
         self.new_block = False
         self.model = None
         self.graphics_loaded = False
+        self.direction_to_vector = {
+            "heading_up": {"left": Vector2(-1, 0), "right": Vector2(1, 0)},
+            "heading_down": {"left": Vector2(1, 0), "right": Vector2(-1, 0)},
+            "heading_left": {"left": Vector2(0, 1), "right": Vector2(0, -1)},
+            "heading_right": {"left": Vector2(0, -1), "right": Vector2(0, 1)},
+        }
+
+    def reset(self, cell_number):
+        # headx, heady = np.random.random_integers(2, cell_number - 3, size=(2,))
+        headx, heady = 3, 3
+        self.body = [Vector2(headx - x, heady) for x in range(3)]
+        self.direction = Vector2(0, 0)
+
+    def load_model(self, env):
+        self.model = DQN.load("dqn_snake", env=env)
+
+    def learn(self, env):
+        self.model = DQN(
+            "MlpPolicy",
+            env,
+            learning_rate=0.0001,
+            buffer_size=100000,
+            learning_starts=50000,
+            batch_size=32,
+            tau=1.0,
+            gamma=0.99,
+            train_freq=4,
+            gradient_steps=1,
+            target_update_interval=1000,
+            exploration_fraction=0.25,
+            exploration_initial_eps=1.0,
+            exploration_final_eps=0.05,
+            max_grad_norm=10,
+            tensorboard_log="./dqn_snake_tensorboard/",
+        )
+        self.model.learn(
+            total_timesteps=int(7e5),
+            log_interval=1000,
+            tb_log_name="rew=10",
+            progress_bar=True,
+        )
+        self.model.save("dqn_snake")
+
+    def act(self, obs):
+        action, _states = self.model.predict(obs, deterministic=True)
+        return action
+
+    def evaluate(self, env, episodes):
+        return evaluate_policy(self.model, env, render=True, n_eval_episodes=episodes)
 
     def get_head(self):
         return self.body[0]
 
-    def load_graphics(self):
-        if self.graphics_loaded:
-            return
-        self.graphics_loaded = True
-        self.head_up = pygame.image.load("Graphics/head_up.png").convert_alpha()
-        self.head_down = pygame.image.load("Graphics/head_down.png").convert_alpha()
-        self.head_right = pygame.image.load("Graphics/head_right.png").convert_alpha()
-        self.head_left = pygame.image.load("Graphics/head_left.png").convert_alpha()
+    def my_front(self):
+        return self.get_head() + self.direction
 
-        self.tail_up = pygame.image.load("Graphics/tail_up.png").convert_alpha()
-        self.tail_down = pygame.image.load("Graphics/tail_down.png").convert_alpha()
-        self.tail_right = pygame.image.load("Graphics/tail_right.png").convert_alpha()
-        self.tail_left = pygame.image.load("Graphics/tail_left.png").convert_alpha()
+    def go_left(self):
+        """ returns (direction, head pos after direction)"""
+        vector = None
+        if self.heading_up():
+            vector = self.direction_to_vector["heading_up"]["left"]
+        elif self.heading_down():
+            vector = self.direction_to_vector["heading_down"]["left"]
+        elif self.heading_left():
+            vector = self.direction_to_vector["heading_left"]["left"]
+        else:
+            vector = self.direction_to_vector["heading_right"]["left"]
+        return (vector, self.get_head() + vector)
 
-        self.body_vertical = pygame.image.load(
-            "Graphics/body_vertical.png"
-        ).convert_alpha()
-        self.body_horizontal = pygame.image.load(
-            "Graphics/body_horizontal.png"
-        ).convert_alpha()
+    def go_right(self):
+        """ returns (direction, head pos after direction)"""
+        vector = None
+        if self.heading_up():
+            vector = self.direction_to_vector["heading_up"]["right"]
+        elif self.heading_down():
+            vector = self.direction_to_vector["heading_down"]["right"]
+        elif self.heading_left():
+            vector = self.direction_to_vector["heading_left"]["right"]
+        else:
+            vector = self.direction_to_vector["heading_right"]["right"]
+        return (vector, self.get_head() + vector)
 
-        self.body_tr = pygame.image.load("Graphics/body_tr.png").convert_alpha()
-        self.body_tl = pygame.image.load("Graphics/body_tl.png").convert_alpha()
-        self.body_br = pygame.image.load("Graphics/body_br.png").convert_alpha()
-        self.body_bl = pygame.image.load("Graphics/body_bl.png").convert_alpha()
+    def heading_up(self):
+        return self.direction.y == -1
+
+    def heading_down(self):
+        return self.direction.y == 1
+
+    def heading_left(self):
+        return self.direction.x == -1
+
+    def heading_right(self):
+        return self.direction.x == 1
+
+    def obstacle_front(self):
+        return self.my_front() in self.body[1:]
+
+    def obstacle_left(self):
+        return self.go_left()[1] in self.body[1:]
+
+    def obstacle_right(self):
+        return self.go_right()[1] in self.body[1:]
+
+    def on_edge_front(self, num_cells):
+        return not (
+            0 <= self.my_front().x < num_cells and 0 <= self.my_front().y < num_cells
+        )
+
+    def on_edge_left(self, num_cells):
+        return not (
+            0 <= self.go_left()[1].x < num_cells
+            and 0 <= self.go_left()[1].y < num_cells
+        )
+
+    def on_edge_right(self, num_cells):
+        return not (
+            0 <= self.go_right()[1].x < num_cells
+            and 0 <= self.go_right()[1].y < num_cells
+        )
+
+    def add_block(self):
+        self.new_block = True
+
+    def check_if_crashed(self, snakes, cell_number):
+        if not (0 <= self.body[0].x < cell_number) or not (
+            0 <= self.body[0].y < cell_number
+        ):
+            return True
+        for snake in snakes:
+            if self != snake and self.body[0] == snake.body[0]:
+                return True
+            body = snake.body if snake != self else self.body[1:]
+            for part in body:
+                if self.body[0] == part:
+                    return True
 
     def render(
         self,
@@ -118,61 +224,28 @@ class Snake:
         elif tail_relation == Vector2(0, -1):
             self.tail = self.tail_down
 
-    def load_model(self, env):
-        self.model = DQN.load("dqn_snake", env=env)
+    def load_graphics(self):
+        if self.graphics_loaded:
+            return
+        self.graphics_loaded = True
+        self.head_up = pygame.image.load("Graphics/head_up.png").convert_alpha()
+        self.head_down = pygame.image.load("Graphics/head_down.png").convert_alpha()
+        self.head_right = pygame.image.load("Graphics/head_right.png").convert_alpha()
+        self.head_left = pygame.image.load("Graphics/head_left.png").convert_alpha()
 
-    def learn(self, env):
-        self.model = DQN(
-            "MlpPolicy",
-            env,
-            learning_rate=0.0001,
-            buffer_size=100000,
-            learning_starts=50000,
-            batch_size=32,
-            tau=1.0,
-            gamma=0.99,
-            train_freq=4,
-            gradient_steps=1,
-            target_update_interval=1000,
-            exploration_fraction=0.25,
-            exploration_initial_eps=1.0,
-            exploration_final_eps=0.05,
-            max_grad_norm=10,
-            tensorboard_log="./dqn_snake_tensorboard/",
-        )
-        self.model.learn(
-            total_timesteps=int(7e5),
-            log_interval=1000,
-            tb_log_name="rew=10",
-            progress_bar=True,
-        )
-        self.model.save("dqn_snake")
+        self.tail_up = pygame.image.load("Graphics/tail_up.png").convert_alpha()
+        self.tail_down = pygame.image.load("Graphics/tail_down.png").convert_alpha()
+        self.tail_right = pygame.image.load("Graphics/tail_right.png").convert_alpha()
+        self.tail_left = pygame.image.load("Graphics/tail_left.png").convert_alpha()
 
-    def act(self, obs):
-        action, _states = self.model.predict(obs, deterministic=True)
-        return action
+        self.body_vertical = pygame.image.load(
+            "Graphics/body_vertical.png"
+        ).convert_alpha()
+        self.body_horizontal = pygame.image.load(
+            "Graphics/body_horizontal.png"
+        ).convert_alpha()
 
-    def evaluate(self, env, episodes):
-        return evaluate_policy(self.model, env, render=True, n_eval_episodes=episodes)
-
-    def add_block(self):
-        self.new_block = True
-
-    def reset(self, cell_number):
-        # headx, heady = np.random.random_integers(2, cell_number - 3, size=(2,))
-        headx, heady = 3, 3
-        self.body = [Vector2(headx - x, heady) for x in range(3)]
-        self.direction = Vector2(0, 0)
-
-    def check_if_crashed(self, snakes, cell_number):
-        if not (0 <= self.body[0].x < cell_number) or not (
-            0 <= self.body[0].y < cell_number
-        ):
-            return True
-        for snake in snakes:
-            if self != snake and self.body[0] == snake.body[0]:
-                return True
-            body = snake.body if snake != self else self.body[1:]
-            for part in body:
-                if self.body[0] == part:
-                    return True
+        self.body_tr = pygame.image.load("Graphics/body_tr.png").convert_alpha()
+        self.body_tl = pygame.image.load("Graphics/body_tl.png").convert_alpha()
+        self.body_br = pygame.image.load("Graphics/body_br.png").convert_alpha()
+        self.body_bl = pygame.image.load("Graphics/body_bl.png").convert_alpha()
