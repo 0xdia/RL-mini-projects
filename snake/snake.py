@@ -1,7 +1,8 @@
 import pygame
-from pygame.math import Vector2
 import numpy as np
+from pygame.math import Vector2
 from stable_baselines3 import DQN
+from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 
 
@@ -20,36 +21,36 @@ class Snake:
 
     def reset(self, cell_number):
         # headx, heady = np.random.random_integers(2, cell_number - 3, size=(2,))
-        headx, heady = 3, 3
+        headx, heady = 4, 4
         self.body = [Vector2(headx - x, heady) for x in range(3)]
-        self.direction = Vector2(0, 0)
+        self.direction = Vector2(1, 0)
 
     def load_model(self, env):
         self.model = DQN.load("dqn_snake", env=env)
 
     def learn(self, env):
         self.model = DQN(
-            "MlpPolicy",
+            "MultiInputPolicy",
             env,
             learning_rate=0.0001,
-            buffer_size=100000,
+            buffer_size=1000000,
             learning_starts=50000,
             batch_size=32,
             tau=1.0,
             gamma=0.99,
             train_freq=4,
             gradient_steps=1,
-            target_update_interval=1000,
-            exploration_fraction=0.25,
+            target_update_interval=10000,
+            exploration_fraction=0.5,
             exploration_initial_eps=1.0,
             exploration_final_eps=0.05,
             max_grad_norm=10,
             tensorboard_log="./dqn_snake_tensorboard/",
         )
         self.model.learn(
-            total_timesteps=int(7e5),
-            log_interval=1000,
-            tb_log_name="rew=10",
+            total_timesteps=int(2e5),
+            log_interval=10,
+            tb_log_name="rew",
             progress_bar=True,
         )
         self.model.save("dqn_snake")
@@ -131,21 +132,52 @@ class Snake:
             and 0 <= self.go_right()[1].y < num_cells
         )
 
+    def fruit_front(self, fruit):
+        return (
+            (self.heading_up() and self.get_head().y > fruit.y)
+            or (self.heading_down() and self.get_head().y < fruit.y)
+            or (self.heading_left() and self.get_head().x > fruit.x)
+            or (self.heading_right() and self.get_head().x < fruit.x)
+        )
+
+    def fruit_behind(self, fruit):
+        return (
+            (self.heading_up() and self.get_head().y < fruit.y)
+            or (self.heading_down() and self.get_head().y > fruit.y)
+            or (self.heading_left() and self.get_head().x < fruit.x)
+            or (self.heading_right() and self.get_head().x > fruit.x)
+        )
+
+    def fruit_left(self, fruit):
+        return (
+            (self.heading_up() and self.get_head().x > fruit.x)
+            or (self.heading_down() and self.get_head().x < fruit.x)
+            or (self.heading_left() and self.get_head().y < fruit.y)
+            or (self.heading_right() and self.get_head().y > fruit.y)
+        )
+
+    def fruit_right(self, fruit):
+        return (
+            (self.heading_up() and self.get_head().x < fruit.x)
+            or (self.heading_down() and self.get_head().x > fruit.x)
+            or (self.heading_left() and self.get_head().y > fruit.y)
+            or (self.heading_right() and self.get_head().y < fruit.y)
+        )
+
+    def len(self):
+        return len(self.body) - 3
+
     def add_block(self):
         self.new_block = True
 
-    def check_if_crashed(self, snakes, cell_number):
+    def check_if_crashed(self, cell_number):
         if not (0 <= self.body[0].x < cell_number) or not (
             0 <= self.body[0].y < cell_number
         ):
             return True
-        for snake in snakes:
-            if self != snake and self.body[0] == snake.body[0]:
-                return True
-            body = snake.body if snake != self else self.body[1:]
-            for part in body:
-                if self.body[0] == part:
-                    return True
+        if self.get_head() in self.body[1:]:
+            return True
+        return False
 
     def render(
         self,

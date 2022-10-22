@@ -2,7 +2,6 @@ import numpy as np
 import gym
 from gym import spaces
 import pygame
-from pygame.math import Vector2
 from time import sleep
 
 import fruit
@@ -10,7 +9,7 @@ import fruit
 CELL_SIZE = 35
 
 NUM_OF_FRUITS = 1
-EATING_REWARD = 200.0
+EATING_REWARD = 10.0
 
 
 class GameGymEnv(gym.Env):
@@ -21,18 +20,21 @@ class GameGymEnv(gym.Env):
         self.num_of_cells = num_of_cells
         self.snakes = snakes
         self.fruits = []
+        self.add_fruits()
 
-        self.observation_space = spaces.Box(
-            -1, num_of_cells, shape=(1, 5), dtype=np.int8
+        self.observation_space = spaces.Dict(
+            {
+                "agent": spaces.Box(0, num_of_cells - 1, shape=(2,), dtype=int),
+                "target": spaces.Box(0, num_of_cells - 1, shape=(2,), dtype=int),
+            }
         )
         self.action_space = spaces.Discrete(3)
         self.graphics_initiated = False
 
     def reset(self):
         super().reset()
-        self.snakes.reset(self.num_of_cells)
         self.add_fruits()
-        return np.array(self._get_obs())
+        return self._get_obs()
 
     def add_fruits(self):
         while True:
@@ -57,36 +59,25 @@ class GameGymEnv(gym.Env):
                 self.snakes.go_left()[0] if action == 1 else self.snakes.go_right()[0]
             )
         self.snakes.body.insert(0, self.snakes.body[0] + self.snakes.direction)
+
+    def adjust_snake(self):
         if self.snakes.new_block == True:
             self.snakes.new_block = False
         else:
             self.snakes.body.pop(-1)
 
     def _get_obs(self):
-        state = [
-            -(
-                self.snakes.obstacle_front()
-                or self.snakes.on_edge_front(self.num_of_cells)
-            ),
-            -(
-                self.snakes.obstacle_left()
-                or self.snakes.on_edge_left(self.num_of_cells)
-            ),
-            -(
-                self.snakes.obstacle_right()
-                or self.snakes.on_edge_right(self.num_of_cells)
-            ),
-            self.fruits[0].x,
-            self.fruits[0].y,
-        ]
-        return np.array(state)
+        return {
+            "agent": (self.snakes.get_head().x, self.snakes.get_head().y),
+            "target": (self.fruits[0].x, self.fruits[0].y),
+        }
 
     def _get_info(self):
         return {"snakes_heads": self.snakes.body[0], "fruits": len(self.fruits)}
 
     def distance(self):
-        return np.abs(self.snakes.body[0].x - self.fruits[0].x) + np.abs(
-            self.snakes.body[0].y - self.fruits[0].y
+        return np.abs(self.snakes.get_head().x - self.fruits[0].x) + np.abs(
+            self.snakes.get_head().y - self.fruits[0].y
         )
 
     def step(self, action):
@@ -96,11 +87,14 @@ class GameGymEnv(gym.Env):
         if self.check_eats():
             rewards = EATING_REWARD
             self.add_fruits()
-        if self.check_collision():
+            self.adjust_snake()
+        elif self.check_collision():
+            self.snakes.reset(self.num_of_cells)
             dones = True
-            rewards = -50.0
+            rewards = -5.0
         else:
-            rewards = 0.0
+            rewards = -1.0
+            self.adjust_snake()
         return self._get_obs(), rewards, dones, self._get_info()
 
     def check_eats(self):
@@ -112,7 +106,7 @@ class GameGymEnv(gym.Env):
         return False
 
     def check_collision(self):
-        return self.snakes.check_if_crashed([self.snakes], self.num_of_cells)
+        return self.snakes.check_if_crashed(self.num_of_cells)
 
     def render(self, mode=None):
         if not self.graphics_initiated:
