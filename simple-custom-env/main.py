@@ -24,11 +24,12 @@ model = DQN(
 )
 
 model.learn(
-    total_timesteps=int(1e6),
-    log_interval=10,
-    tb_log_name="rew",
+    total_timesteps=int(1e7),
+    log_interval=1000,
+    tb_log_name="1e7",
     progress_bar=True,
 )
+
 model.save("dqn_model")
 evaluate_policy(model, env, render=True, n_eval_episodes=50)
 env.close()
